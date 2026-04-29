@@ -1,0 +1,586 @@
+// Simple backend for handling OTP emails
+// This file should be run separately from the React app
+// You can use: node backend/server.js
+
+import express from 'express';
+import nodemailer from 'nodemailer';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Database file path
+const DB_PATH = path.join(__dirname, 'database.json');
+
+// Database operations
+const readDatabase = () => {
+  try {
+    const data = fs.readFileSync(DB_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error reading database:', error);
+    return {
+      users: [],
+      sellers: [],
+      products: [],
+      orders: [],
+      coupons: [],
+      supportTickets: [],
+      otpStore: {}
+    };
+  }
+};
+
+const writeDatabase = (data) => {
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error('Error writing database:', error);
+  }
+};
+
+// Utility functions
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const generateTempPassword = () => {
+  return crypto.randomBytes(8).toString('hex');
+};
+
+const hashPassword = async (password) => {
+  return await bcrypt.hash(password, 10);
+};
+
+const verifyPassword = async (password, hash) => {
+  return await bcrypt.compare(password, hash);
+};
+
+const generateToken = (user) => {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+};
+
+const verifyToken = (token) => {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch (error) {
+    return null;
+  }
+};
+
+// Middleware to verify JWT
+const authenticateToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'Access token required' });
+  }
+
+  const decoded = verifyToken(token);
+  if (!decoded) {
+    return res.status(403).json({ success: false, message: 'Invalid token' });
+  }
+
+  req.user = decoded;
+  next();
+};
+
+// Send OTP Email
+app.post('/api/send-otp', async (req, res) => {
+  try {
+    const { email, otp, userType } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and OTP are required'
+      });
+    }
+
+    // Prepare email content
+    const subject = userType === 'seller' 
+      ? 'Your Seller Registration OTP - IIMSTC'
+      : 'Your Account Verification OTP - IIMSTC';
+
+    const htmlContent = getEmailTemplate(otp, userType);
+
+    // Send email
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject,
+      html: htmlContent
+    });
+
+    // Store OTP temporarily (5 minutes)
+    otpStore[email] = {
+      otp,
+      expiresAt: Date.now() + 5 * 60 * 1000
+    };
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent successfully',
+      email: email
+    });
+  } catch (error) {
+    console.error('Error sending OTP:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send OTP: ' + error.message
+    });
+  }
+});
+
+// Verify OTP
+app.post('/api/verify-otp', (req, res) => {
+  try {
+    const { email, otp, userType } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and OTP are required'
+      });
+    }
+
+    const storedOTP = otpStore[email];
+
+    if (!storedOTP) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP not found. Please request a new one.'
+      });
+    }
+
+    if (Date.now() > storedOTP.expiresAt) {
+      delete otpStore[email];
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Please request a new one.'
+      });
+    }
+
+    if (storedOTP.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP'
+      });
+    }
+
+    // OTP verified, remove it
+    delete otpStore[email];
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP verified successfully',
+      email: email
+    });
+  } catch (error) {
+    console.error('Error verifying OTP:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify OTP: ' + error.message
+    });
+  }
+});
+
+// Complete Signup
+app.post('/api/complete-signup', async (req, res) => {
+  try {
+    const { email, name, password, phone } = req.body;
+
+    // Here you would save the user to database
+    // For now, just send a confirmation email
+    const confirmationEmail = getSignupConfirmationTemplate(name);
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Welcome to IIMSTC - Account Created Successfully',
+      html: confirmationEmail
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Account created successfully',
+      user: { email, name }
+    });
+  } catch (error) {
+    console.error('Error completing signup:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to complete signup: ' + error.message
+    });
+  }
+});
+
+// Complete Seller Registration
+app.post('/api/complete-seller-registration', async (req, res) => {
+  try {
+    const { email, businessName, businessType, phone } = req.body;
+
+    // Here you would save the seller to database
+    // For now, just send a confirmation email
+    const confirmationEmail = getSellerConfirmationTemplate(businessName);
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Welcome to IIMSTC Seller Portal - Account Created Successfully',
+      html: confirmationEmail
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Seller account created successfully',
+      seller: { email, businessName }
+    });
+  } catch (error) {
+    console.error('Error completing seller registration:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to complete seller registration: ' + error.message
+    });
+  }
+});
+
+// Email Templates
+function getEmailTemplate(otp, userType) {
+  const title = userType === 'seller' ? 'Seller Registration' : 'Account Verification';
+  const message = userType === 'seller'
+    ? 'Complete your seller registration on IIMSTC'
+    : 'Verify your email to create your IIMSTC account';
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+            .container { max-width: 500px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+            .content { padding: 30px; }
+            .otp-box { background: #f0f4ff; border: 2px solid #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+            .otp-code { font-size: 36px; font-weight: bold; color: #667eea; letter-spacing: 5px; }
+            .footer { background: #f9f9f9; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #eee; }
+            .warning { font-size: 12px; color: #999; margin-top: 10px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>IIMSTC - ${title}</h2>
+            </div>
+            <div class="content">
+                <p>Hello,</p>
+                <p>${message}. Use the OTP below:</p>
+                <div class="otp-box">
+                    <div class="otp-code">${otp}</div>
+                </div>
+                <p style="color: #666; margin-top: 20px;">This OTP will expire in 5 minutes.</p>
+                <p class="warning">⚠️ Never share this OTP with anyone. IIMSTC staff will never ask for it.</p>
+            </div>
+            <div class="footer">
+                <p>If you didn't request this, please ignore this email.</p>
+                <p>&copy; 2024 IIMSTC. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+  `;
+}
+
+function getSignupConfirmationTemplate(name) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+            .container { max-width: 500px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+            .content { padding: 30px; }
+            .success-badge { background: #10b981; color: white; padding: 10px 20px; border-radius: 5px; display: inline-block; margin: 15px 0; }
+            .footer { background: #f9f9f9; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #eee; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>✓ Account Created Successfully</h2>
+            </div>
+            <div class="content">
+                <p>Hello ${name},</p>
+                <p>Welcome to IIMSTC! Your account has been created successfully.</p>
+                <div class="success-badge">Account Verified</div>
+                <p>You can now:</p>
+                <ul>
+                    <li>Browse and purchase authentic crafts</li>
+                    <li>Support rural artisans directly</li>
+                    <li>Track your orders</li>
+                </ul>
+                <p>Thank you for being part of our community!</p>
+            </div>
+            <div class="footer">
+                <p>&copy; 2024 IIMSTC. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+  `;
+}
+
+function getSellerConfirmationTemplate(businessName) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+            .container { max-width: 500px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+            .content { padding: 30px; }
+            .success-badge { background: #10b981; color: white; padding: 10px 20px; border-radius: 5px; display: inline-block; margin: 15px 0; }
+            .footer { background: #f9f9f9; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #eee; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>✓ Seller Account Created Successfully</h2>
+            </div>
+            <div class="content">
+                <p>Hello ${businessName},</p>
+                <p>Your seller account on IIMSTC has been created successfully!</p>
+                <div class="success-badge">Account Verified</div>
+                <p>You can now:</p>
+                <ul>
+                    <li>Add and manage your products</li>
+                    <li>Track sales and orders</li>
+                    <li>Reach customers across India</li>
+                    <li>Grow your business with IIMSTC</li>
+                </ul>
+                <p>Welcome to the IIMSTC Seller Community!</p>
+            </div>
+            <div class="footer">
+                <p>&copy; 2024 IIMSTC. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+  `;
+}
+
+// ============= ADMIN PANEL APIS =============
+
+// Get Admin Dashboard Stats
+app.get('/api/admin/dashboard-stats', (req, res) => {
+  res.json({
+    success: true,
+    stats: {
+      totalUsers: 1245,
+      totalSellers: 89,
+      totalOrders: 3456,
+      totalRevenue: 875000,
+      pendingSellers: 12,
+      activeChats: 8
+    }
+  });
+});
+
+// Get Pending Sellers
+app.get('/api/admin/sellers-pending', (req, res) => {
+  res.json({
+    success: true,
+    sellers: [
+      { id: 1, name: 'My Crafts', email: 'crafts@example.com', status: 'pending', date: '2024-04-15' },
+      { id: 2, name: 'Pottery House', email: 'pottery@example.com', status: 'pending', date: '2024-04-14' }
+    ]
+  });
+});
+
+// Approve/Reject Seller
+app.post('/api/admin/seller-action', (req, res) => {
+  const { sellerId, action } = req.body;
+  
+  const message = action === 'approve' 
+    ? 'Seller approved successfully'
+    : 'Seller rejected';
+
+  res.json({
+    success: true,
+    message: message,
+    data: { sellerId, action }
+  });
+});
+
+// Get All Users
+app.get('/api/admin/users', (req, res) => {
+  res.json({
+    success: true,
+    users: [
+      { id: 1, name: 'John Doe', email: 'john@example.com', joined: '2024-03-15', status: 'active' },
+      { id: 2, name: 'Jane Smith', email: 'jane@example.com', joined: '2024-02-20', status: 'active' }
+    ]
+  });
+});
+
+// Get All Orders
+app.get('/api/admin/orders', (req, res) => {
+  res.json({
+    success: true,
+    orders: [
+      { id: 'ORD001', customer: 'John Doe', amount: 5000, status: 'shipped', date: '2024-04-15' },
+      { id: 'ORD002', customer: 'Jane Smith', amount: 8500, status: 'delivered', date: '2024-04-14' }
+    ]
+  });
+});
+
+// Get Support Tickets
+app.get('/api/admin/support-tickets', (req, res) => {
+  res.json({
+    success: true,
+    tickets: [
+      { id: 'TKT001', customer: 'User123', subject: 'Order not received', status: 'open', date: '2024-04-15' },
+      { id: 'TKT002', customer: 'User456', subject: 'Payment issue', status: 'in-progress', date: '2024-04-14' }
+    ]
+  });
+});
+
+// ============= CUSTOMER SUPPORT APIS =============
+
+// Store support messages (use database in production)
+const supportChats = {};
+
+// Get or Create Support Chat
+app.get('/api/support/chat/:userId', (req, res) => {
+  const { userId } = req.params;
+
+  if (!supportChats[userId]) {
+    supportChats[userId] = {
+      userId,
+      messages: [
+        {
+          id: 1,
+          sender: 'admin',
+          text: 'Hello! How can we help you today?',
+          timestamp: new Date(),
+          status: 'read'
+        }
+      ],
+      createdAt: new Date()
+    };
+  }
+
+  res.json({
+    success: true,
+    chat: supportChats[userId]
+  });
+});
+
+// Send Support Message
+app.post('/api/support/message', (req, res) => {
+  const { userId, text, sender } = req.body;
+
+  if (!userId || !text) {
+    return res.status(400).json({
+      success: false,
+      message: 'UserId and message text are required'
+    });
+  }
+
+  if (!supportChats[userId]) {
+    supportChats[userId] = {
+      userId,
+      messages: [],
+      createdAt: new Date()
+    };
+  }
+
+  const newMessage = {
+    id: supportChats[userId].messages.length + 1,
+    sender: sender || 'user',
+    text,
+    timestamp: new Date(),
+    status: sender === 'admin' ? 'read' : 'sent'
+  };
+
+  supportChats[userId].messages.push(newMessage);
+
+  // Auto-respond from admin after 2 seconds (for demo)
+  if (sender !== 'admin') {
+    setTimeout(() => {
+      const adminResponse = {
+        id: supportChats[userId].messages.length + 1,
+        sender: 'admin',
+        text: 'Thanks for your message. Our team will get back to you shortly!',
+        timestamp: new Date(),
+        status: 'read'
+      };
+      supportChats[userId].messages.push(adminResponse);
+    }, 2000);
+  }
+
+  res.json({
+    success: true,
+    message: 'Message sent successfully',
+    data: newMessage
+  });
+});
+
+// Get Support Tickets for User
+app.get('/api/support/tickets/:userId', (req, res) => {
+  const { userId } = req.params;
+
+  res.json({
+    success: true,
+    tickets: [
+      {
+        id: 'TKT001',
+        subject: 'Order not received',
+        status: 'open',
+        createdAt: '2024-04-15',
+        messages: 5
+      },
+      {
+        id: 'TKT002',
+        subject: 'Product quality issue',
+        status: 'resolved',
+        createdAt: '2024-04-10',
+        messages: 8
+      }
+    ]
+  });
+});
+
+// Health Check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Server is running' });
+});
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`📧 Email Service: ${process.env.EMAIL_SERVICE}`);
+});

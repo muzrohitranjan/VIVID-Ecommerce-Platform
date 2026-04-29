@@ -1,0 +1,66 @@
+{
+  "users": [
+    {
+      "id": "1777269259962",
+      "name": "abhi",
+      "email": "gowdachinnu223@gmail.com",
+      "password": "$2b$10$k46TO1vxJxhfbWyA1DbE5ONx/it7aGU49eFhvl0EYHkuNxxj9Qwb.",
+      "phone": "06360970294",
+      "role": "user",
+      "accountStatus": "active",
+      "createdAt": "2026-04-27T05:54:19.962Z"
+    }
+  ],
+  "sellers": [
+    {
+      "id": "1777268581735",
+      "businessName": "business",
+      "businessType": "crafts",
+      "email": "gowdachinnu223@gmail.com",
+      "password": "$2b$10$Wf6PEnl4ic5NHvVaVZLl.O4zL4CAM2AluvSINvcb/NHUJYD1UFpoy",
+      "phone": "06360970294",
+      "address": "dgvdfhbfhf",
+      "role": "seller",
+      "status": "pending",
+      "products": [],
+      "createdAt": "2026-04-27T05:43:01.735Z"
+    },
+    {
+      "id": "1777269760859",
+      "businessName": "business",
+      "businessType": "crafts",
+      "email": "shayanagowda8@gmail.com",
+      "password": "$2b$10$mrIGKs2dbusWHK70TTOtheikepQNQRnyA7jCcsLiTzbyXpG1.mCdu",
+      "phone": "06360970294",
+      "address": "thtrhr",
+      "role": "seller",
+      "status": "pending",
+      "products": [],
+      "createdAt": "2026-04-27T06:02:40.860Z"
+    },
+    {
+      "id": "1777270719876",
+      "businessName": "gdgdg",
+      "businessType": "crafts",
+      "email": "gowdaananya4431@gmail.com",
+      "password": "$2b$10$ZGYhLoCzoqXIjhQOcjzc6.UbYI73nGA8XLUVImKm0EoBuIcKbxQWm",
+      "phone": "06360970294",
+      "address": "fthththgfh",
+      "role": "seller",
+      "status": "pending",
+      "products": [],
+      "createdAt": "2026-04-27T06:18:39.876Z"
+    }
+  ],
+  "products": [],
+  "orders": [],
+  "coupons": [],
+  "supportTickets": [],
+  "otpStore": {
+    "test@example.com": {
+      "otp": "136303",
+      "expiresAt": 1777268902195,
+      "userType": "user"
+    }
+  }
+}
