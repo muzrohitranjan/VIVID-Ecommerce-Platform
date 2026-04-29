@@ -1,4 +1,4 @@
-y// Unified Node.js Backend for VIVID - Main app + Auth + Admin + E-commerce
+// Unified Node.js Backend for VIVID - Main app + Auth + Admin + E-commerce
 // Proxies seller ML APIs to Python FastAPI at http://localhost:8000
 
 import express from 'express';
@@ -82,7 +82,7 @@ if (!emailUser || !emailPass) {
   console.warn('⚠️ EMAIL_USER or EMAIL_PASS not set. OTP emails will fail.');
 }
 
-const transporter = nodemailer.default.createTransporter({
+const transporter = nodemailer.createTransporter({
   service: emailService,
   auth: { user: emailUser, pass: emailPass },
   tls: { rejectUnauthorized: false }

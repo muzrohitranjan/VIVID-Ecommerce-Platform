@@ -1,52 +1,97 @@
-# VIVID-Final - Complete E-commerce + AI Seller Platform
+# VIVID - Artisan E-commerce Platform w/ AI ✨
 
-## 🚀 Quick Start (PowerShell - Run each command separately)
+## 🎯 Features
+- **Seller Dashboard** - Product CRUD + analytics
+- **AI Product Enhancement** - Auto description, translation, STT
+- **Multi-language** - Tamil/Kannada → English (IndicTrans2 1B)
+- **Customer Flow** - Shop, cart, checkout, profile
+- **Admin Panel** - Stats, user management  
+- **Voice Upload** - Speech-to-text powered
+- **Responsive** - Mobile-first design
 
-### Terminal 1: Seller API (ML/AI Features)
+## 🛠 Tech Stack
+```
+Frontend: React 19 + Vite 8 + TailwindCSS + Lucide
+Backend: Node.js 24 + Express (5000)
+Seller API: FastAPI + Uvicorn (8000) 
+AI/ML: Transformers + IndicTrans2 + Faster-Whisper
+DB: JSON (dev) / MongoDB (prod)
+Auth: JWT + bcrypt + OTP email
+```
+
+## 🚀 Quick Start (PowerShell - 3 Terminals)
+
+### Terminal 1: Seller API + ML (Python)
 ```powershell
 cd "c:/Users/muzro/OneDrive/Desktop/VIVID-Final/seller-api"
 .\venv\Scripts\Activate.ps1
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
-✅ http://localhost:8000/docs
+**Test:** http://localhost:8000/docs
 
-### Terminal 2: Backend (Node.js/Auth)
+### Terminal 2: Main Backend (Node.js)  
 ```powershell
 cd "c:/Users/muzro/OneDrive/Desktop/VIVID-Final/backend"
+npm install
 npm run dev
 ```
-✅ http://localhost:5000/api/health
+**Test:** http://localhost:5000/api/health
 
 ### Terminal 3: Frontend (React)
 ```powershell
-cd "c:/Users/muzro/OneDrive/Desktop/VIVID-Final/frontend"
+cd "c:/Users/muzro/OneDrive/Desktop/VIVID-Final/frontend"  
+npm install
 npm run dev
 ```
-🌐 http://localhost:5173
+**App:** http://localhost:5173
 
-## ✨ Features Complete
-- ✅ Seller Registration/Login (OTP Email)
-- ✅ Product Upload (Images + AI Description Gen)
-- ✅ ML Features: Translation, STT, Auto-description
-- ✅ Seller Dashboard (CRUD Products)
-- ✅ Customer Flow: Shop → Cart → Checkout
-- ✅ Admin Dashboard + Stats
-- ✅ Proxy Chain: Frontend → Backend → Seller-API
-
-## 🧪 End-to-End Test Flow
-1. Seller Register/Login → http://localhost:5173/seller-login
-2. Upload Product (/sell) → AI processes → Dashboard lists
-3. Customer browses → Add to cart → Checkout
-
-## 📁 Structure
+## 📁 Project Structure
 ```
 VIVID-Final/
-├── seller-api/     # FastAPI + ML (8000)
-├── backend/        # Node/Express (5000)  
-└── frontend/       # React/Vite (5173)
-    └── database.json (shared)
+├── backend/          # Node.js API (auth + proxy, port 5000)
+├── frontend/         # React app (port 5173)
+├── seller-api/       # Nida's FastAPI + ML (port 8000)  
+├── database.json     # Shared dev DB
+└── README.md
 ```
 
-## ✅ Status: Production Ready
-All imports fixed, proxies working, full AI e-commerce platform integrated.
+## 🔄 API Flow
+```
+Frontend (5173) 
+  ↓ Vite Proxy
+Backend (5000)  
+  ↓ Express Proxy (/api/seller → 8000)
+Seller API (8000)  
+  ↓ ML Services  
+AI/ML Pipeline
+```
+
+## ✅ Test Flow
+1. **Register seller** → localhost:5173/seller/register
+2. **Login** → Get JWT  
+3. **Upload product** → Voice + AI desc + image
+4. **Dashboard** → localhost:5173/seller/dashboard
+5. **Customer shop** → Browse + cart
+
+## 🔧 Troubleshooting
+```
+❌ Backend 5000 fails → npm install && npm run dev
+❌ seller-api 8000 fails → .\venv\Scripts\Activate.ps1 → pip install -r requirements.txt  
+❌ Frontend 5173 icons fail → npm install lucide-react
+❌ Proxy fails → Check ports 5000+8000 running first
+❌ ML slow → GPU acceleration (CUDA recommended)
+```
+
+## 📊 Production Deployment
+```
+Docker: docker-compose up
+Cloud: Vercel(frontend) + Railway(backend) + Render(FastAPI)
+DB: MongoDB Atlas
+Email: SendGrid/Resend
+CDN: Cloudinary (images)
+```
+
+**Live Demo:** http://localhost:5173  
+**Repo:** https://github.com/muzrohitranjan/VIVID-Ecommerce-Platform  
+**API Docs:** http://localhost:8000/docs
 
