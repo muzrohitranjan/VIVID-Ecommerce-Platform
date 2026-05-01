@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { MapPin, ShieldCheck, Heart, ShoppingBag } from 'lucide-react';
 import { dummyProducts } from '../data/products';
@@ -7,9 +7,34 @@ import { useCart } from '../context/CartContext';
 export default function ProductDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const product = dummyProducts.find(p => p.id === parseInt(id));
+  const [apiProduct, setApiProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const staticProduct = dummyProducts.find(p => p.id === parseInt(id));
+  const product = apiProduct || staticProduct;
   const { addToCart } = useCart();
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    fetch(`http://localhost:5000/api/products/${id}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!cancelled && data?.success) {
+          setApiProduct(data.product);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (loading && !product) return <h2>Loading product...</h2>;
   if (!product) return <h2>Product not found</h2>;
 
   return (
@@ -22,8 +47,8 @@ export default function ProductDetails() {
         
         <div className="preserve-3d" style={{ flex: '1 1 400px', borderRadius: 'var(--radius-md)', transform: 'translateZ(40px)', transition: 'transform 0.5s ease' }}>
           <img 
-            src={product.image} 
-            alt={product.title} 
+            src={product.image || product.image_url || '/images/1.png'} 
+            alt={product.title || product.name} 
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 'var(--radius-md)', boxShadow: '0 30px 60px rgba(0,0,0,0.3)' }}
           />
         </div>
@@ -45,11 +70,11 @@ export default function ProductDetails() {
             </button>
           </div>
           
-          <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{product.title}</h1>
+          <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{product.title || product.name}</h1>
           
           <div className="flex items-center gap-2 text-muted" style={{ marginBottom: '2rem', fontSize: '1.1rem' }}>
             <MapPin size={20} color="var(--color-secondary)" />
-            <span>Crafted by <strong>{product.artisan}</strong> in {product.location}</span>
+            <span>Crafted by <strong>{product.artisan || product.sellerName || 'VIVID Seller'}</strong> in {product.location || 'India'}</span>
           </div>
 
           <p style={{ fontSize: '1.1rem', lineHeight: 1.8, marginBottom: '2rem', color: 'var(--color-text-dark)' }}>

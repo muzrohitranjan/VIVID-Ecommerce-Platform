@@ -17,7 +17,7 @@ const SellerDashboard = () => {
       const res = await axios.get('/api/seller/products', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setProducts(res.data);
+      setProducts(res.data.products || []);
     } catch (err) {
       console.error('Failed to fetch products:', err);
     } finally {
@@ -68,9 +68,9 @@ const SellerDashboard = () => {
           {products.map(product => (
             <div key={product.id} className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-indigo-200 hover:shadow-2xl transition-all hover:-translate-y-2">
               <div className="relative mb-6">
-                {product.image_url ? (
+                {(product.image_url || product.image) ? (
                   <img 
-                    src={product.image_url} 
+                    src={product.image_url || product.image} 
                     alt={product.name}
                     className="w-full h-64 object-cover rounded-2xl"
                   />
@@ -120,4 +120,3 @@ const SellerDashboard = () => {
 };
 
 export default SellerDashboard;
-

@@ -34,6 +34,7 @@ function App() {
               <Route path="/seller-dashboard" element={<SellerDashboard />} />
               <Route path="/seller-login" element={<SellerLogin />} />
               <Route path="/products/:id" element={<ProductDetails />} />
+              <Route path="/product/:id" element={<ProductDetails />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/payment" element={<Payment />} />
@@ -55,4 +56,3 @@ function App() {
 }
 
 export default App;
-
