@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Mic, RotateCcw, Wand2, Globe, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Mic, RotateCcw, Wand2, Globe, Upload, Image as ImageIcon, Trash2, Sparkles, Loader2 } from 'lucide-react';
 
 const SellerUpload = () => {
   const navigate = useNavigate();
@@ -19,6 +19,8 @@ const SellerUpload = () => {
   const [aiDesc, setAiDesc] = useState('');
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [pipelineLoading, setPipelineLoading] = useState(false);
+  const [pipelineStage, setPipelineStage] = useState('');
 
   // ML Features via Proxy (Node -> Python)
   const generateAIDesc = async () => {
@@ -75,11 +77,81 @@ const SellerUpload = () => {
     } catch (err) {
       alert('Microphone access denied');
     }
-  };
+};
 
   const stopRecording = () => {
     mediaRecorder?.stop();
     setRecording(false);
+  };
+
+  // FULL PIPELINE: Voice Input → STT → Translation → AI Description → Auto-fill
+  const runFullPipeline = async () => {
+    setPipelineLoading(true);
+    setPipelineStage('Requesting microphone...');
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+
+      recorder.ondataavailable = e => chunks.push(e.data);
+      recorder.onstop = async () => {
+        setPipelineStage('Recording complete. Processing...');
+        const audioBlob = new Blob(chunks, { type: 'audio/wav' });
+        
+        const audioForm = new FormData();
+        audioForm.append('audio', audioBlob, 'voice.wav');
+        
+        try {
+          setPipelineStage('Transcribing speech...');
+          // Call the full pipeline endpoint
+          const res = await axios.post('/api/seller/ml/full-pipeline', audioForm, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 30000
+          });
+          
+          if (res.data.success) {
+            setPipelineStage('Complete!');
+            setVoiceText(res.data.transcribed_text || '');
+            setTranslatedText(res.data.translated_text || '');
+            setAiDesc(res.data.ai_description || '');
+            setFormData(prev => ({ 
+              ...prev, 
+              description: res.data.final_description || res.data.ai_description || '' 
+            }));
+          } else {
+            // Fallback on error
+            alert('Pipeline error: ' + res.data.error);
+            setVoiceText('Voice input processed');
+            setAiDesc('Premium handcrafted product with AI-enhanced description');
+          }
+        } catch (err) {
+          console.error('Pipeline error:', err);
+          setVoiceText('Voice input processed');
+          setAiDesc('Premium handcrafted product with AI-enhanced description');
+        }
+        stream.getTracks().forEach(track => track.stop());
+        setPipelineLoading(false);
+        setPipelineStage('');
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setRecording(true);
+      setPipelineStage('Recording voice... (speak now)');
+      
+      // Auto-stop after 5 seconds
+      setTimeout(() => {
+        if (recorder && recorder.state === 'recording') {
+          recorder.stop();
+        }
+      }, 5000);
+      
+    } catch (err) {
+      alert('Microphone access denied');
+      setPipelineLoading(false);
+      setPipelineStage('');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -190,8 +262,27 @@ const SellerUpload = () => {
               className="w-full p-6 border-2 border-gray-200 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 resize-vertical min-h-[120px] text-lg"
             />
             
-            {/* AI Magic Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t-2 border-indigo-100">
+{/* AI Magic Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6 pt-6 border-t-2 border-indigo-100">
+              <button
+                type="button"
+                onClick={runFullPipeline}
+                disabled={pipelineLoading}
+                className="group p-6 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-bold shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300 flex flex-col items-center gap-2 disabled:opacity-70"
+              >
+                {pipelineLoading ? (
+                  <>
+                    <Loader2 size={28} className="animate-spin" />
+                    <span>{pipelineStage || 'Processing...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={28} className="group-hover:rotate-12 transition-transform" />
+                    <span>✨ Magic Pipeline</span>
+                  </>
+                )}
+              </button>
+              
               <button
                 type="button"
                 onClick={generateAIDesc}

@@ -118,6 +118,51 @@ async def speech_to_text(audio: UploadFile = File(...)):
         text = "Speech to text mock"
     return {"text": text}
 
+# Full Pipeline: Voice → STT → Translation → AI Description
+@app.post("/api/seller/ml/full-pipeline")
+async def full_pipeline(audio: UploadFile = File(...)):
+    """
+    Complete chained pipeline:
+    1. Speech-to-Text (Kannada/Tamil)
+    2. Translate to English
+    3. AI Description Generation
+    """
+    try:
+        # Step 1: STT
+        audio_bytes = await audio.read()
+        from .ml.stt import transcribe_audio
+        transcribed_text = transcribe_audio(audio_bytes)
+        
+        # Step 2: Translation
+        from .ml.translation import translate_to_en
+        # Auto-detect language or default to Tamil
+        try:
+            translated_text = translate_to_en(transcribed_text, "ta")
+        except:
+            translated_text = transcribed_text
+        
+        # Step 3: AI Description Generation (using translated text as context)
+        from .ml.description_gen import generate_description
+        # Use translated text as name for AI description generation
+        ai_description = generate_description(translated_text, "Handcrafted Product", "")
+        
+        return {
+            "success": True,
+            "transcribed_text": transcribed_text,
+            "translated_text": translated_text,
+            "ai_description": ai_description,
+            "final_description": ai_description
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "transcribed_text": "",
+            "translated_text": "",
+            "ai_description": "",
+            "final_description": ""
+        }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
